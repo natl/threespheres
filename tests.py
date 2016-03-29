@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # NOQA
 
 
-def triple_sphere_plot(p1, p2, p3, r1, r2, r3):
+def triple_sphere_plot(p1, p2, p3, r1, r2, r3, wireframe=False):
     """
     """
 
@@ -16,7 +16,10 @@ def triple_sphere_plot(p1, p2, p3, r1, r2, r3):
     ax = fig.add_subplot(111, projection='3d')
     for (r, p, c) in zip([r1, r2, r3], [p1, p2, p3], ['r', 'g', 'b']):
         x, y, z = ellipse_xyz(p, np.ones([3]) * r)
-        ax.plot_wireframe(x, y, z, color=c)
+        if wireframe is True:
+            ax.plot_wireframe(x, y, z, color=c)
+        else:
+            ax.plot_surface(x, y, z, rstride=1, cstride=1, color=c)
     fig.show()
 
     return fig
@@ -24,7 +27,7 @@ def triple_sphere_plot(p1, p2, p3, r1, r2, r3):
 
 def ellipse_xyz(center, extent):
     [a, b, c] = extent
-    u, v = np.mgrid[0:2 * np.pi:40j, 0:np.pi:20j]
+    u, v = np.mgrid[0:2 * np.pi:80j, 0:np.pi:40j]
     x = a * np.cos(u) * np.sin(v) + center[0]
     y = b * np.sin(u) * np.sin(v) + center[1]
     z = c * np.cos(v) + center[2]
@@ -73,7 +76,7 @@ class TestSpheres(unittest.TestCase):
         r2 = 2
         r3 = 3
         vol = threespheres.triple_overlap(p1, p2, p3, r1, r2, r3)
-        v_mc = self.mc_triple_volume(p1, p2, p3, r1, r2, r3)
+        v_mc = threespheres.mc_triple_volume(p1, p2, p3, r1, r2, r3)
         v = np.round(vol, 4)
         print("d12: {0} r1: {1}".format(d12, r1))
         print("d23: {0} r2: {1}".format(d23, r2))
@@ -84,74 +87,36 @@ class TestSpheres(unittest.TestCase):
                          "paper, got {}".format(v))
         return None
 
-    def test_mc(self):
-        for ii in range(50):
-            rvec = np.random.random(3)
-            pvec = [np.random.random(3) for ii in range(3)]
-            v_mc = self.mc_triple_volume(pvec[0], pvec[1], pvec[2],
-                                         rvec[0], rvec[1], rvec[2])
-            v_math = threespheres.triple_overlap(
-                pvec[0], pvec[1], pvec[2], rvec[0], rvec[1], rvec[2])
-
-            v_mc = np.round(v_mc, 1)
-            v_math = np.round(v_math, 1)
-            if v_mc == v_math:
-                print("Correct match for v_mc: {0} and v_math: {1}".format(v_mc, v_math))
-            else:
-                print("MC and analytic values differ\n" +
-                      "v_mc: {0} v_math: {1}".format(v_mc, v_math))
-
-                fig = plt.figure()
-                ax = fig.add_subplot(111, projection='3d')
-                for (r, p, c) in zip(rvec, pvec, ['r', 'g', 'b']):
-                    x, y, z = ellipse_xyz(p, np.ones([3]) * r)
-                    ax.plot_wireframe(x, y, z, color=c)
-                fig.show()
-
-                print("repeating with more n")
-                v_mc = self.mc_triple_volume(pvec[0], pvec[1], pvec[2],
-                                             rvec[0], rvec[1], rvec[2], n=1e6)
-                v_mc = np.round(v_mc, 1)
-                if v_mc != v_math:
-                    print("MC and analytic values still differ\n" +
-                          "v_mc: {0} v_math: {1}".format(v_mc, v_math))
-                    print("repeating with more n")
-                    v_mc = self.mc_triple_volume(pvec[0], pvec[1], pvec[2],
-                                                 rvec[0], rvec[1], rvec[2],
-                                                 n=1e7)
-
-                    self.assertEqual(v_mc, v_math,
-                                     "MC and analytic values differ\n" +
-                                     "v_mc: {0} v_math: {1}".format(v_mc,
-                                                                    v_math))
-            pass
-
-    @staticmethod
-    def mc_triple_volume(p1, p2, p3, r1, r2, r3, n=1e5):
-        rvec = np.array([r1, r2, r3])
-        minx = min(np.array([p1[0], p2[0], p3[0]]) - rvec)
-        miny = min(np.array([p1[1], p2[1], p3[1]]) - rvec)
-        minz = min(np.array([p1[2], p2[2], p3[2]]) - rvec)
-        maxx = max(np.array([p1[0], p2[0], p3[0]]) + rvec)
-        maxy = max(np.array([p1[1], p2[1], p3[1]]) + rvec)
-        maxz = max(np.array([p1[2], p2[2], p3[2]]) + rvec)
-
-        mins = np.array([minx, miny, minz])
-        maxs = np.array([maxx, maxy, maxz])
-        centres = 0.5 * (maxs + mins)
-        ranges = maxs - mins
-
-        in_overlap = 0.
-        in_circle = lambda p, c, r: sum((p - c) ** 2.) ** 0.5 < r
-        for ii in xrange(int(n)):
-            position = (np.random.random(3) - 0.5) * ranges + centres
-            in1 = in_circle(position, p1, r1)
-            in2 = in_circle(position, p2, r2)
-            in3 = in_circle(position, p3, r3)
-            if in1 and in2 and in3:
-                in_overlap += 1
-        vol_total = np.product(ranges)
-        return vol_total * in_overlap / n
+    # def test_mc(self):
+    #     for ii in range(50):
+    #         rvec = np.random.random(3)
+    #         pvec = [np.random.random(3) for ii in range(3)]
+    #         v_mc = threespheres.mc_triple_volume(pvec[0], pvec[1], pvec[2],
+    #                                 rvec[0], rvec[1], rvec[2], n=1e6)
+    #         v_math = threespheres.triple_overlap(
+    #             pvec[0], pvec[1], pvec[2], rvec[0], rvec[1], rvec[2])
+    #
+    #         v_mc = np.round(v_mc, 1)
+    #         v_math = np.round(v_math, 1)
+    #         if v_mc == v_math:
+    #             pass
+    #             # print("Correct match for v_mc: {0} and v_math: {1}".format(v_mc, v_math))
+    #         else:
+    #             print("MC and analytic values differ\n" +
+    #                   "v_mc: {0} v_math: {1}".format(v_mc, v_math))
+    #
+    #             # fig = plt.figure()
+    #             # ax = fig.add_subplot(111, projection='3d')
+    #             # for (r, p, c) in zip(rvec, pvec, ['r', 'g', 'b']):
+    #             #     x, y, z = ellipse_xyz(p, np.ones([3]) * r)
+    #             #     ax.plot_wireframe(x, y, z, color=c)
+    #             # fig.show()
+    #
+    #         # self.assertEqual(v_mc, v_math,
+    #         #                  "MC and analytic values differ\n" +
+    #         #                  "v_mc: {0} v_math: {1}".format(v_mc,
+    #         #                                                 v_math))
+    #         pass
 
 
 if __name__ == '__main__':
